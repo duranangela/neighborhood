@@ -13,22 +13,9 @@ class Api::V1::UsersController < ApiController
   end
 
   def create
-    status = 200
-    user = User.find_by_email(oauth_params[:email])
-    if !user && !(all_required?) && oauth_params[:username]
-      existing_user = User.find_by_username(oauth_params[:username])
-      user = existing_user if authenticate(existing_user)
-    end
-    if user.nil? && all_required?
-      user = User.create(oauth_params)
-    elsif user && !(user.authenticate(oauth_params[:password]))
-      user = {message: 'Incorrect login!'}
-      status = 400
-    elsif !user && !(all_required?)
-      user = {message: 'Incorrect parameters given!'}
-      status = 400
-    end
-    render json: user, status: status
+    user = find_and_authenticate(oauth_params[:email])
+    response = verify_input(user)
+    render json: response[:json], status: response[:status]
   end
 
   def update
@@ -42,6 +29,30 @@ class Api::V1::UsersController < ApiController
   end
 
   private
+
+
+  def verify_input(user)
+    status = 200
+    if user.nil? && all_required?
+      user = User.create(oauth_params)
+    elsif user && !(user.authenticate(oauth_params[:password]))
+      user = {message: 'Incorrect login!'}
+      status = 400
+    elsif !user && !(all_required?)
+      user = {message: 'Incorrect parameters given!'}
+      status = 400
+    end
+    {json: user, status: status}
+  end
+
+  def find_and_authenticate(email)
+    user = User.find_by_email(email)
+    if !user && !(all_required?) && oauth_params[:username]
+      existing_user = User.find_by_username(oauth_params[:username])
+      user = existing_user if authenticate(existing_user)
+    end
+    user
+  end
 
   def all_required?
     oauth_params.keys.count == 6
